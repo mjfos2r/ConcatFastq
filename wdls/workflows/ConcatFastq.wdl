@@ -72,8 +72,9 @@ task Concatenate {
     cat ~{fastq_1} | seqkit stats -aT > fq_1_stats.tsv
     cat ~{fastq_2} | seqkit stats -aT | tail -n1 > fq_2_stats.tsv
     zcat ~{fn_clean}_combined.fastq.gz | seqkit stats -aT | tail -n1 > fq_m_stats.tsv
-
+    echo "Finished! combining stats into single table for output."
     cat fq_1_stats.tsv fq_2_stats.tsv fq_m_stats.tsv > fq_all_stats.tsv
+    echo "Task complete!"
     >>>
 
     output {
