@@ -88,7 +88,7 @@ task Concatenate {
         boot_disk_gb:       50,
         preemptible_tries:  0,
         max_retries:        1,
-        docker:             "mjfos2r/samtools:latest"
+        docker:             "mjfos2r/align-tools:latest"
     }
     RuntimeAttr runtime_attr = select_first([runtime_attr_override, default_attr])
     runtime {
