@@ -67,11 +67,11 @@ task Concatenate {
 
     echo "concatenating both fastq files provided and saving to:"
     echo "~{fn_clean}_combined.fastq.gz"
-    cat ~{fastq_1} ~{fastq_2} > ~{fn_clean}_combined.fastq.gz
+    cat ~{fastq_1} ~{fastq_2} | gzip > ~{fn_clean}_combined.fastq.gz
     echo "grabbing stats of both input and the concatenated output files..."
-    seqkit stats -aT -i ~{fastq_1} > fq_1_stats.tsv
-    seqkit stats -aT -i ~{fastq_2} | tail -n1 > fq_2_stats.tsv
-    seqkit stats -aT -i ~{fn_clean}_combined.fastq.gz | tail -n1 > fq_m_stats.tsv
+    cat ~{fastq_1} | seqkit stats -aT > fq_1_stats.tsv
+    cat ~{fastq_2} | seqkit stats -aT | tail -n1 > fq_2_stats.tsv
+    zcat ~{fn_clean}_combined.fastq.gz | seqkit stats -aT | tail -n1 > fq_m_stats.tsv
 
     cat fq_1_stats.tsv fq_2_stats.tsv fq_m_stats.tsv > fq_all_stats.tsv
     >>>
