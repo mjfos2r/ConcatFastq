@@ -11,13 +11,14 @@ workflow ConcatFastq {
         fastq_1: "first fastq file to concat"
         fastq_2: "second fastq file to concat"
         sample_id: "our sample id, [optional: can default to basename of fastq_1"
+        compress: "boolean toggle for whether the resulting output should be gzipped or left uncompressed."
     }
 
     input {
         File fastq_1
         File fastq_2
+        Boolean compress = false
         String? sample_id
-        RuntimeAttr? runtime_attr_override
     }
 
     # call our first task/workflow
@@ -25,6 +26,7 @@ workflow ConcatFastq {
         input:
         fastq_1 = fastq_1,
         fastq_2 = fastq_2,
+        compress = compress,
         sample_id = sample_id
     }
 
@@ -44,41 +46,52 @@ task Concatenate {
         fastq_1: "first fastq file to concat"
         fastq_2: "second fastq file to concat"
         sample_id: "our sample id, [optional: can default to basename of fastq_1"
+        compress: "boolean toggle for whether the resulting output should be gzipped or left uncompressed."
     }
 
     input {
         File fastq_1
         File fastq_2
         String? sample_id
+        Boolean compress = false
         RuntimeAttr? runtime_attr_override
     }
 
+
     String bn_input = basename(fastq_1)
     String fn_raw = select_first([sample_id, bn_input])
-    String fn_clean = sub(fn_raw, "\\.fastq$", "")
+    String fn_clean = sub(sub(fn_raw, "\\.gz$", ""), "\\.fastq$", "")
+
+    String suffix = if compress then ".fastq.gz" else ".fastq"
+    String out_path = "~{fn_clean}_combined~{suffix}"
+
     Float input_size = size([fastq_1, fastq_2], "GB")
-    Int disk_size = 365 + 3*ceil(input_size)
+    Int disk_size = 30 + 3*ceil(input_size)
 
     command <<<
     set -euo pipefail # if anything breaks crash out
 
-    # get the number of procs we have available
-    NPROCS=$( cat /proc/cpuinfo | grep '^processor' | tail -n1 | awk '{print $NF+1}' )
+    echo "Output: ~{out_path}"
+    echo "concatenating both fastq files provided."
+    # check for compression flag, set output filepath
 
-    echo "concatenating both fastq files provided and saving to:"
-    echo "~{fn_clean}_combined.fastq.gz"
-    cat ~{fastq_1} ~{fastq_2} | gzip > ~{fn_clean}_combined.fastq.gz
+    if [[ "~{compress}" == "true" ]]; then
+        cat ~{fastq_1} ~{fastq_2} | gzip > ~{out_path}
+    else
+        cat ~{fastq_1} ~{fastq_2} > ~{out_path}
+    fi
+
     echo "grabbing stats of both input and the concatenated output files..."
-    seqkit stats -aT ~{fastq_1} > fq_1_stats.tsv
-    seqkit stats -aT ~{fastq_2} | tail -n1 > fq_2_stats.tsv
-    seqkit stats -aT ~{fn_clean}_combined.fastq.gz | tail -n1 > fq_m_stats.tsv
+    seqkit stats -aT -i "$(basename ~{fastq_1})" ~{fastq_1} > fq_1_stats.tsv
+    seqkit stats -aT -i "$(basename ~{fastq_2})" ~{fastq_2} | tail -n1 > fq_2_stats.tsv
+    seqkit stats -aT -i "$(basename ~{out_path})" ~{out_path} | tail -n1 > fq_m_stats.tsv
     echo "Finished! combining stats into single table for output."
     cat fq_1_stats.tsv fq_2_stats.tsv fq_m_stats.tsv > fq_all_stats.tsv
     echo "Task complete!"
     >>>
 
     output {
-        File merged_fastq = "~{fn_clean}_combined.fastq.gz"
+        File merged_fastq = "~{out_path}"
         File merged_seq_stats = "fq_all_stats.tsv"
     }
 
